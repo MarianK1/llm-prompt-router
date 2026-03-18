@@ -1,0 +1,12 @@
+{
+  "built_at": "2026-03-17",
+  "model": "all-MiniLM-L6-v2",
+  "simple_examples_count": 60,
+  "complex_examples_count": 60,
+  "embedding_dim": 384,
+  "files": [
+    "simple_embeddings.npy",
+    "complex_embeddings.npy"
+  ],
+  "notes": "Pre-computed online. Run the '.py' file to regenerate. See README for methodology."
+}

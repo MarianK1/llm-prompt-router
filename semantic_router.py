@@ -1,81 +1,59 @@
+import logging
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import config
+
+
+log = logging.getLogger(__name__)
 
 class SemanticRouter:
     """ 
     Embedding-based Semantic Router.
-    TF-IDF Vectorization and Cosine Similarity to direct queries
+    K-Nearest Neighbor to direct queries
     based on semantic proximity to 'simple' and 'complex' clusters
     """
-    def __init__(self):
-        self.simple_examples = [
-            "Translate 'hello' to French.",
-            "What is the capital city of Albania?",
-            "Summarize this email in one sentence:...",
-            "What time is it in Bogota now?",
-            "Give me a quick recipe for pancakes."
-        ]
+    def __init__(self, simple_path = 'simple_embeddings.npy', complex_path = 'complex_embeddings.npy'):
         
-        self.complex_examples = [
-            "Debug this Python script and explain in detail why it throws this memory error.",
-            "Analyze the logic behind quantum computing and explain it to a high-schooler in a few words.",
-            "Write a detailed architectural plan for migrating a Postgres database to AWS with distinct steps of its architecture.",
-            "Why did the Roman Empire fall? Compare the economic and military factors.",
-            "Write a React component that manages state for a multi-step checkout form."
-        ]
+        log.info("Loading embedding model: %s", config.EMBEDDING_MODEL)
+        self.model = SentenceTransformer(config.EMBEDDING_MODEL)
         
-        # initializing and training vectorizer on known data
-        self.vectorizer = TfidfVectorizer(stop_words = 'english')
-        all_examples = self.simple_examples + self.complex_examples
-        
-        self.vectorizer.fit(all_examples)
-        
-        # creating mathematical centroids or avg vectors for both sides
-        simple_matrix = self.vectorizer.transform(self.simple_examples)
-        self.simple_centroid = np.mean(simple_matrix.toarray(), axis = 0).reshape(1, -1)
-        
-        complex_matrix = self.vectorizer.transform(self.complex_examples)
-        self.complex_centroid = np.mean(complex_matrix.toarray(), axis = 0).reshape(1, -1)
+        # loading files with matrices
+        self.simple_embeddings = np.load(simple_path)
+        self.complex_embeddings = np.load(complex_path)
         
         
-    def small_model(self, query: str) -> dict:
-        return {"model": config.models["small"]["name"], "cost_tier": "low", "query": query}
-    
-    def adv_model(self, query: str) -> dict:
-        return {"model": config.models["advanced"]["name"], "cist_tier": "high", "query": query}
-    
-    def route_query(self, query: str) -> dict:
-        # convert incoming query into vector
-        query_vector = self.vectorizer.transform([query]).toarray()
         
-        # calculate cosine similarity to centroids
-        sim_to_simple = cosine_similarity(query_vector, self.simple_centroid)[0][0]
-        sim_to_complex = cosine_similarity(query_vector, self.complex_centroid)[0][0]
+    def route(self, query: str) -> tuple[str, float, float]:
+        # embed incoming query
+        query_embedding = self._embed([query])
         
-        # routing logic
-        if sim_to_complex > sim_to_simple or len(query.split()) > 100:
-            return self.adv_model(query)
-        elif sim_to_simple > sim_to_complex:
-            return self.small_model(query)
+        # calculating similarity against every single example
+        sim_simple = cosine_similarity(query_embedding, self.simple_embeddings)[0]
+        sim_complex = cosine_similarity(query_embedding, self.complex_embeddings)[0]
+        
+        # maximum similarity score
+        max_sim_s = float(np.max(sim_simple))
+        max_sim_c = float(np.max(sim_complex))
+        
+        # routing
+        if max_sim_s > max_sim_c:
+            return "simple", max_sim_s, max_sim_c
         else:
-            # some sort of possible tiebreaker in OOD cases
-            if len(query.split()) > config.LEN_THRESHOLD:
-                return self.adv_model(query)
-            return self.small_model(query)
+            return "complex", max_sim_s, max_sim_c
+    
+    def _embed(self, texts: list[str]) -> np.ndarray:
+        # convert to numpy returns an ndarray
+        # normalize embeddings ensures L2 normalization
+        return self.model.encode(texts, convert_to_numpy=True, normalize_embeddings=True)
         
 if __name__ == "__main__":
+    # testing and downloading for first run
+    print("Running semantic router test...")
+    simple_ex = ["say hello", "what time is it"]
+    adv_ex = ["debug this memory leak", "explain quantum physics"]
+    
     router = SemanticRouter()
+    res = router.route("fix my python code")
     
-    test_queries = [
-        "What is 5 plus 5?", # unseen simple
-        "Can you build a scalable microservice architecture through Kubernetes and gRPC?", # complex
-        "Explain performance tradeoffs in an LLM cascade" # complex
-    ]
-    
-    print(f"{'Query':<80} | {'Assigned Model'}")
-    print("-"*100)
-    for q in test_queries:
-        result = router.route_query(q)
-        print(f"{q:<80} | {result['model']}")
+    print(f"Test passed. Route: {res[0]}, Similarity for Simple: {res[1]:.3f}, Similarity for Complex: {res[2]:.3f}")
