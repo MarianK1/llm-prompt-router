@@ -81,8 +81,8 @@ Power users discover the router's semantic signals. Complex phrasing gets used t
 
 **Second Failure Mode:** *Continuous Space Trap (V3)*
 As seen by our benchmarks, small dense models guess wildly on specific jargon, misdirecting complex queries. At the same time, reliance on a discrete fallback (routing all `0.0` unknown vocabulary to the expensive model) creates a massive financial vulnerability where typos, random spam, or completely irrelevant OOD queries overload the premium API.
-* **Next Steps (V4):**
-* **LLM Cascading & Anomaly Detection:** The goal is to balance semantic accuracy with strict FinOps constraints. To reach this, V4 will pivot away from a single-shot router to a *"Fail-Fast Cascade."* Low-confidence queries (e.g., dense `max_score < 0.3` or TF-IDF `0.0`) will be routed to the *cheap* model (`gpt-4o-mini`) first, equipped with a strict system prompt instructing it to explicitly decline if it lacks the reasoning capability. Only upon a recognized decline will the system escalate the query to `claude-3.5-sonnet`. This protects the budget from OOD spam while safely catching edge cases.
+**Next Steps (V4):**
+   * **LLM Cascading & Anomaly Detection:** The goal is to balance semantic accuracy with strict FinOps constraints. To reach this, V4 will pivot away from a single-shot router to a *"Fail-Fast Cascade."* Low-confidence queries (e.g., dense `max_score < 0.3` or TF-IDF `0.0`) will be routed to the *cheap* model (`gpt-4o-mini`) first, equipped with a strict system prompt instructing it to explicitly decline if it lacks the reasoning capability. Only upon a recognized decline will the system escalate the query to `claude-3.5-sonnet`. This protects the budget from OOD spam while safely catching edge cases.
 
 ---
 
